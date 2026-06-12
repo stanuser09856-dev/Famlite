@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MY POCKET</title>
+    <title>FAMLITE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -56,7 +56,7 @@
 
 <div id="global-loader">
     <div class="loader-wheel"></div>
-    <p class="mt-4 text-[#10b981] text-xs font-bold tracking-widest uppercase">My Pocket</p>
+    <p class="mt-4 text-[#10b981] text-xs font-bold tracking-widest uppercase">Famlite</p>
 </div>
 
 <nav id="bottom-nav" class="fixed bottom-0 w-full max-w-md bg-white/90 backdrop-blur-md border-t border-emerald-100/50 flex justify-around items-center h-20 z-[900] hidden rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.03)] pb-2 px-2">
@@ -159,6 +159,15 @@
                 <i class="fa-solid fa-chevron-right text-gray-300 relative z-10"></i>
             </div>
         </div>
+
+        <div class="space-y-4">
+            <h3 class="text-sm font-bold text-gray-800 px-1 flex justify-between items-center">
+                <span>Recent Transactions</span>
+                <button onclick="navTo('history-screen', document.querySelectorAll('.nav-btn')[1])" class="text-xs text-emerald-600 font-bold hover:underline">View All</button>
+            </h3>
+            <div id="dash-history-list" class="space-y-3">
+                </div>
+        </div>
     </div>
 </div>
 
@@ -184,7 +193,7 @@
     <div class="w-full max-w-sm">
         <div class="text-center mb-10">
             <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-[2rem] flex items-center justify-center text-4xl mx-auto mb-6 shadow-sm"><i class="fa-solid fa-wallet"></i></div>
-            <h1 class="text-3xl font-extrabold text-gray-800 tracking-tight">My Pocket</h1>
+            <h1 class="text-3xl font-extrabold text-gray-800 tracking-tight">Famlite</h1>
             <p class="text-sm text-gray-500 font-medium mt-2">Sign in to manage your funds</p>
         </div>
         <div class="space-y-5">
@@ -201,7 +210,7 @@
             </div>
             <button onclick="handleLogin()" class="w-full bg-emerald-600 text-white font-bold rounded-2xl py-4 mt-4 shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition active:scale-95">SIGN IN</button>
             <div class="text-center mt-8">
-                <p class="text-sm text-gray-500 font-medium">New to My Pocket?</p>
+                <p class="text-sm text-gray-500 font-medium">New to Famlite?</p>
                 <button onclick="showScreen('register-screen')" class="text-emerald-600 font-bold text-base mt-2 hover:underline">Create an account</button>
             </div>
         </div>
@@ -420,7 +429,7 @@
         <h3 class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">API URL (Auto Payment)</h3>
         <div class="bg-black/30 p-4 rounded-xl border border-white/10">
             <p class="text-[11px] font-mono text-gray-300 break-all leading-relaxed">
-                https://my-pocket.vercel.app/api/pay?key=<span class="text-emerald-400" id="api-url-key">{Api_key}</span>&paytm=<span class="text-orange-400">{number}</span>&amount=<span class="text-orange-400">{amount}</span>
+                https://famlite.vercel.app/api/pay?key=<span class="text-emerald-400" id="api-url-key">{Api_key}</span>&paytm=<span class="text-orange-400">{number}</span>&amount=<span class="text-orange-400">{amount}</span>
             </p>
         </div>
     </div>
@@ -778,10 +787,57 @@ function startSync() {
             document.getElementById('dash-greeting-name').innerText = u.name ? u.name.split(' ')[0] : 'User';
             
             if(config.upiId) document.getElementById('user-deposit-upi').innerText = config.upiId;
+
+            // Silently refresh dashboard history during synchronization
+            syncDashboardHistory();
         } catch(e) {}
     };
     fetchSync(); 
     syncTimer = setInterval(fetchSync, 3000); 
+}
+
+// Function to pull and compile history list for Dashboard page (New to Old)
+async function syncDashboardHistory() {
+    const dashList = document.getElementById('dash-history-list');
+    if(!dashList) return;
+    try {
+        let txns = await apiCall('HISTORY', { phone: currentUser.phone });
+        if(!txns || txns.length === 0) {
+            dashList.innerHTML = `<div class="text-center py-6 bg-white rounded-2xl border border-gray-50"><p class="text-xs font-bold text-gray-400">No Recent Transactions</p></div>`;
+            return;
+        }
+        txns.sort((a, b) => b.timestamp - a.timestamp);
+        
+        let finalHtml = "";
+        txns.forEach(data => {
+            let isCredit = data.isCredit; let title = data.title;
+            let sign = isCredit ? "+" : "-"; let color = isCredit ? "text-emerald-600" : "text-gray-800";
+            let bgIcon = isCredit ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-600";
+            let arrow = isCredit ? "fa-arrow-down" : "fa-arrow-up";
+            let statusText = data.status || "SUCCESS"; let statusColor = "text-emerald-500";
+            if (data.status === 'PENDING') { statusText = "Pending"; statusColor = "text-orange-500"; color = "text-gray-800"; sign = ""; } 
+            else if (data.status === 'REJECTED') { statusText = "Rejected"; statusColor = "text-red-500"; color = "text-gray-400";
+                if (data.type === 'WITH') { isCredit = true; sign = "+"; color = "text-emerald-600"; bgIcon = "bg-emerald-50 text-emerald-600"; arrow = "fa-arrow-down"; title = "Withdraw Rejected (Refund)"; } 
+                else if (data.type === 'DEP') { isCredit = false; sign = ""; bgIcon = "bg-red-50 text-red-500"; title = "Deposit Rejected"; }
+            }
+            let shortDate = data.date.split(',')[0]; let extraInfo = data.info ? ` • ${data.info}` : '';
+            finalHtml += `
+            <div onclick="window.showReceipt('${data.amount}', '${title}', 'Sender', 'Recipient', '${data.id}', '${isCredit}', '${data.status}', '${data.date}')" class="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-50 active:scale-95 transition cursor-pointer hover:border-emerald-100">
+                <div class="h-12 w-12 shrink-0 rounded-full ${bgIcon} flex items-center justify-center text-lg"><i class="fa-solid ${arrow}"></i></div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-bold text-gray-800 truncate">${title}</h3>
+                    <p class="text-[10px] font-semibold text-gray-400 mt-1 uppercase tracking-widest truncate">${shortDate}${extraInfo}</p>
+                </div>
+                <div class="text-right shrink-0">
+                    <h3 class="text-base font-extrabold ${color}">${sign}₹${data.amount}</h3>
+                    <p class="text-[9px] font-bold ${statusColor} uppercase tracking-widest mt-1">${statusText}</p>
+                </div>
+            </div>`;
+        });
+        dashList.innerHTML = finalHtml;
+    } catch(e) {
+        dashList.innerHTML = `<div class="text-center py-4 text-xs text-red-400 font-bold">Failed to load recent history</div>`;
+    }
 }
 
 async function updateProfileName() {
@@ -1178,7 +1234,7 @@ async function executeFinalClaim() {
             document.getElementById('claim-result-msg').className = "text-2xl font-black text-gray-800";
         }
     } catch(e) {
-        document.getElementById('claim-game-container').classList.add('hidden');
+        document.getElementById('game-game-container').classList.add('hidden');
         document.getElementById('claim-result-container').classList.remove('hidden');
         document.getElementById('claim-result-msg').innerText = e.message;
         document.getElementById('claim-result-msg').className = "text-lg font-bold text-red-500 leading-tight";
